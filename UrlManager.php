@@ -51,6 +51,11 @@ class UrlManager extends BaseUrlManager
     public $enableDefaultLanguageUrlCode = false;
 
     /**
+     * @var int
+     */
+    public $resetRedirectStatusCode = 302;
+
+    /**
      * @var bool whether to detect the app language from the HTTP headers (i.e.
      * browser settings).  Default is `true`.
      */
@@ -393,7 +398,7 @@ class UrlManager extends BaseUrlManager
             $reset = !$this->enableDefaultLanguageUrlCode && $language === $this->_defaultLanguage;
 
             if ($reset || $normalized) {
-                $this->redirectToLanguage('');
+                $this->redirectToLanguage('', $this->resetRedirectStatusCode);
             }
         } else {
             $language = null;
@@ -588,10 +593,11 @@ class UrlManager extends BaseUrlManager
      *
      * @param string $language the language code to add. Can also be empty to
      * not add any language code.
+     * @param int|null $redirectStatusCode
      * @throws \yii\base\Exception
      * @throws \yii\web\NotFoundHttpException
      */
-    protected function redirectToLanguage($language)
+    protected function redirectToLanguage($language, $redirectStatusCode = null)
     {
         try {
             $result = parent::parseRequest($this->_request);
@@ -625,7 +631,7 @@ class UrlManager extends BaseUrlManager
             return;
         }
         Yii::trace("Redirecting to $url.", __METHOD__);
-        Yii::$app->getResponse()->redirect($url);
+        Yii::$app->getResponse()->redirect($url, $redirectStatusCode);
         if (YII2_LOCALEURLS_TEST) {
             // Response::redirect($url) above will call `Url::to()` internally.
             // So to really test for the same final redirect URL here, we need
