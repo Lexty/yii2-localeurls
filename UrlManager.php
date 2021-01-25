@@ -27,6 +27,11 @@ class UrlManager extends BaseUrlManager
     public $languages = [];
 
     /**
+     * @var callable
+     */
+    public $languagesDynamic;
+
+    /**
      * @var bool whether to enable locale URL specific features
      */
     public $enableLocaleUrls = true;
@@ -175,7 +180,7 @@ class UrlManager extends BaseUrlManager
      */
     public function init()
     {
-        if ($this->enableLocaleUrls && $this->languages) {
+        if ($this->enableLocaleUrls && $this->getLanguages()) {
             if (!$this->enablePrettyUrl) {
                 throw new InvalidConfigException('Locale URL support requires enablePrettyUrl to be set to true.');
             }
@@ -198,7 +203,7 @@ class UrlManager extends BaseUrlManager
      */
     public function parseRequest($request)
     {
-        if ($this->enableLocaleUrls && $this->languages) {
+        if ($this->enableLocaleUrls && $this->getLanguages()) {
             $this->_request = $request;
             $process = true;
             if ($this->ignoreLanguageUrlPatterns) {
@@ -243,7 +248,7 @@ class UrlManager extends BaseUrlManager
             }
         }
 
-        if ($this->enableLocaleUrls && $this->languages) {
+        if ($this->enableLocaleUrls && $this->getLanguages()) {
             $params = (array) $params;
 
             $isLanguageGiven = isset($params[$this->languageParam]);
@@ -269,7 +274,7 @@ class UrlManager extends BaseUrlManager
                     $isLanguageGiven && ($this->enableLanguagePersistence || $this->enableLanguageDetection)
                 )
             ) {
-                $key = array_search($language, $this->languages);
+                $key = array_search($language, $this->getLanguages());
                 if (is_string($key)) {
                     $language = $key;
                 }
@@ -336,6 +341,18 @@ class UrlManager extends BaseUrlManager
     }
 
     /**
+     * @return array|string[]
+     */
+    protected function getLanguages()
+    {
+        if (!$this->languages && is_callable($this->languagesDynamic)) {
+                $languagesDynamic = $this->languagesDynamic;
+                $this->languages = $languagesDynamic();
+        }
+        return $this->languages;
+    }
+
+    /**
      * Checks for a language or locale parameter in the URL and rewrites the
      * pathInfo if found.  If no parameter is found it will try to detect the
      * language from persistent storage (session / cookie) or from browser
@@ -347,7 +364,7 @@ class UrlManager extends BaseUrlManager
     {
         $pathInfo = $this->_request->getPathInfo();
         $parts = [];
-        foreach ($this->languages as $k => $v) {
+        foreach ($this->getLanguages() as $k => $v) {
             $value = is_string($k) ? $k : $v;
             if (substr($value, -2) === '-*') {
                 $lng = substr($value, 0, -2);
@@ -370,9 +387,9 @@ class UrlManager extends BaseUrlManager
         if (preg_match("#^($pattern)\b(/?)#i", $pathInfo, $m)) {
             $this->_request->setPathInfo(mb_substr($pathInfo, mb_strlen($m[1].$m[2])));
             $code = $m[1];
-            if (isset($this->languages[$code])) {
+            if (isset($this->getLanguages()[$code])) {
                 // Replace alias with language code
-                $language = $this->languages[$code];
+                $language = $this->getLanguages()[$code];
             } else {
                 // lowercase language, uppercase country
                 list($language,$country) = $this->matchCode($code);
@@ -420,7 +437,7 @@ class UrlManager extends BaseUrlManager
                 return;
             }
 
-            $key = array_search($language, $this->languages);
+            $key = array_search($language, $this->getLanguages());
             if ($key && is_string($key)) {
                 $language = $key;
             }
@@ -539,7 +556,7 @@ class UrlManager extends BaseUrlManager
     {
         $hasDash = strpos($code, '-') !== false;
         $lcCode = strtolower($code);
-        $lcLanguages = array_map('strtolower', $this->languages);
+        $lcLanguages = array_map('strtolower', $this->getLanguages());
 
         if (($key = array_search($lcCode, $lcLanguages)) === false) {
             if ($hasDash) {
@@ -548,7 +565,7 @@ class UrlManager extends BaseUrlManager
                 $language = $code;
                 $country = null;
             }
-            if (in_array($language . '-*', $this->languages)) {
+            if (in_array($language . '-*', $this->getLanguages())) {
                 if ($hasDash) {
                     // TODO: Make wildcards work with script codes
                     // like `sr-Latn`
@@ -556,13 +573,13 @@ class UrlManager extends BaseUrlManager
                 } else {
                     return [$language, null];
                 }
-            } elseif ($hasDash && in_array($language, $this->languages)) {
+            } elseif ($hasDash && in_array($language, $this->getLanguages())) {
                 return [$language, null];
             } else {
                 return [null, null];
             }
         } else {
-            $result = $this->languages[$key];
+            $result = $this->getLanguages()[$key];
             return $hasDash ? explode('-', $result, 2) : [$result, null];
         }
 
@@ -574,14 +591,14 @@ class UrlManager extends BaseUrlManager
             $country = strtoupper($parts[1]);
         }
 
-        if (in_array($code, $this->languages)) {
+        if (in_array($code, $this->getLanguages())) {
             return [$language, $country];
         } elseif (
-            $country && in_array("$language-$country", $this->languages) ||
-            in_array("$language-*", $this->languages)
+            $country && in_array("$language-$country", $this->getLanguages()) ||
+            in_array("$language-*", $this->getLanguages())
         ) {
             return [$language, $country];
-        } elseif (in_array($language, $this->languages)) {
+        } elseif (in_array($language, $this->getLanguages())) {
             return [$language, null];
         } else {
             return [null, null];
